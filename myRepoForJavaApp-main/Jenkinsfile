@@ -59,7 +59,7 @@ pipeline{
         
         stage('Slack Notify-QA'){
             steps{
-                slackSend channel: 'dec-online-bootcam', message: 'QA Deployment was successful'
+                slackSend channel: 'dec-online-bootcam', message: 'QA Deployment was successfully very'
             }
         }
         
