@@ -1,0 +1,67 @@
+pipeline{
+    agent any
+    tools{
+        maven 'Maven3'
+    }
+    
+    stages{
+        stage('Checkout'){
+            steps{
+                checkout scmGit(branches: [[name: '*/main']], extensions: [], userRemoteConfigs: [[credentialsId: 'e075d032-93ca-40fa-9c7c-2b31753336c4', url: 'https://github.com/neddum/myRepoForJavaApp']])
+            }
+        }
+        
+        stage('Build'){
+            steps{
+                sh 'mvn clean install -f MyWebApp/pom.xml'
+            }
+        }
+        
+        stage('Code Quality'){
+            steps{
+                withSonarQubeEnv('SonarQube') {
+                sh 'mvn -f MyWebApp/pom.xml sonar:sonar'
+                }
+            }
+        }
+        
+        stage('Nexus Upload'){
+            steps{
+                nexusArtifactUploader artifacts: [[artifactId: 'MyWebApp', classifier: '', file: 'MyWebApp/target/MyWebApp.war', type: 'war']], credentialsId: '55fcb3e7-d00c-4217-b0e5-b4bf8e5d0334', groupId: 'com.dept.app', nexusUrl: 'ec2-18-117-149-19.us-east-2.compute.amazonaws.com:8081', nexusVersion: 'nexus3', protocol: 'http', repository: 'maven-snapshots', version: '1.0-SNAPSHOT'
+            }
+        }
+        
+        stage('DEV Deploy'){
+            steps{
+                deploy adapters: [tomcat9(credentialsId: '344bf7dc-fe4b-4b84-a682-77b9c8c9c4ab', path: '', url: 'http://ec2-3-129-19-181.us-east-2.compute.amazonaws.com:8080')], contextPath: null, war: '**/*.war'
+            }
+        }
+        
+        stage('DEV Approval'){
+            steps{
+                 echo "Taking approval from DEV Manager for QA Deployment"
+                 timeout(time: 1, unit: 'MINUTES') {
+                 input message: 'Do you want to deploy into QA ENV?', submitter: 'admin'}
+            }
+        }
+        
+        stage('Slack Notify'){
+            steps{
+                slackSend channel: 'dec-online-bootcam', message: 'DEV Deployment was successful'
+            }
+        }
+        
+        stage('QA Deploy'){
+            steps{
+                deploy adapters: [tomcat9(credentialsId: '344bf7dc-fe4b-4b84-a682-77b9c8c9c4ab', path: '', url: 'http://ec2-3-129-19-181.us-east-2.compute.amazonaws.com:8080')], contextPath: null, war: '**/*.war'
+            }
+        }
+        
+        stage('Slack Notify-QA'){
+            steps{
+                slackSend channel: 'dec-online-bootcam', message: 'QA Deployment was successful'
+            }
+        }
+        
+    }
+}
